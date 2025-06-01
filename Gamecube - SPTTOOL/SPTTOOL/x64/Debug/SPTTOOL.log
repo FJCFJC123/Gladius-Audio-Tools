@@ -1,0 +1,6 @@
+﻿  SPTTOOL.cpp
+C:\Users\ob\source\repos\SPTTOOL\SPTTOOL\SPTTOOL.cpp(1,9): warning C4005: 'UNICODE': macro redefinition
+      C:\Users\ob\source\repos\SPTTOOL\SPTTOOL\SPTTOOL.cpp(1,9):
+      'UNICODE' previously declared on the command line
+  
+  SPTTOOL.vcxproj -> C:\Users\ob\source\repos\SPTTOOL\x64\Debug\SPTTOOL.exe
