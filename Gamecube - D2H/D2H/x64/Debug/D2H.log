@@ -1,6 +1,0 @@
-﻿  D2H.cpp
-C:\Users\ob\source\repos\D2H\D2H\D2H.cpp(1,9): warning C4005: 'UNICODE': macro redefinition
-      C:\Users\ob\source\repos\D2H\D2H\D2H.cpp(1,9):
-      'UNICODE' previously declared on the command line
-  
-  D2H.vcxproj -> C:\Users\ob\source\repos\D2H\x64\Debug\D2H.exe
