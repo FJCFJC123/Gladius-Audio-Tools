@@ -1,6 +1,0 @@
-﻿  WindowsProject1.cpp
-C:\Users\ob\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(1,9): warning C4005: 'UNICODE': macro redefinition
-      C:\Users\ob\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(1,9):
-      'UNICODE' previously declared on the command line
-  
-  WindowsProject1.vcxproj -> C:\Users\ob\source\repos\WindowsProject1\WindowsProject1\x64\Debug\WindowsProject1.exe
