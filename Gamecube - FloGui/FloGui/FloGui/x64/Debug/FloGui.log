@@ -1,0 +1,6 @@
+﻿  FloGui.cpp
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(285,69): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(285,94): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(286,69): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(286,94): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+  FloGui.vcxproj -> C:\Users\ob\source\repos\FloGui\FloGui\x64\Debug\FloGui.exe

@@ -1,0 +1,13 @@
+﻿  FloGui.cpp
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(170,13): warning C4244: 'initializing': conversion from 'LRESULT' to 'int', possible loss of data
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(260,37): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(265,59): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(268,21): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(269,25): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(270,25): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(271,23): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(273,49): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(275,21): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(276,22): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(300,25): warning C4244: 'initializing': conversion from 'LRESULT' to 'int', possible loss of data
+  FloGui.vcxproj -> C:\Users\ob\source\repos\FloGui\x64\Debug\FloGui.exe

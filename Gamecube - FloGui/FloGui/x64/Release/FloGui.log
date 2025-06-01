@@ -1,0 +1,26 @@
+﻿  FloGui.cpp
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(386,13): warning C4244: 'initializing': conversion from 'LRESULT' to 'int', possible loss of data
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(674,55): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(675,67): warning C4267: '+=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(703,17): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(707,21): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(711,21): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(715,19): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(720,76): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(725,17): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(733,20): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(737,26): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(741,26): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(745,28): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(749,24): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(753,26): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(755,28): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(757,18): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(852,37): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(858,47): warning C4312: 'type cast': conversion from 'const int' to 'HMENU' of greater size
+C:\Users\ob\source\repos\FloGui\FloGui\FloGui.cpp(930,25): warning C4244: 'initializing': conversion from 'LRESULT' to 'int', possible loss of data
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 985 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  FloGui.vcxproj -> C:\Users\ob\source\repos\FloGui\x64\Release\FloGui.exe
