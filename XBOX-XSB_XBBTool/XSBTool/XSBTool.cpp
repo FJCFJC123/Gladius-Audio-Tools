@@ -1,4 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #include <commdlg.h>
 #include <shlobj.h>
@@ -68,10 +67,20 @@ static void DoExtract(HWND hwnd) {
     wcscat_s(xsbPath, L".xsb");
     if (!SelectFolder(hwnd, outDir)) return;
 
-    FILE* fXBB = _wfopen(xbbPath, L"rb");
-    if (!fXBB) { MessageBoxW(hwnd, L"Failed to open .XBB", L"Error", MB_OK); return; }
-    FILE* fXSB = _wfopen(xsbPath, L"rb");
-    if (!fXSB) { fclose(fXBB); MessageBoxW(hwnd, L"Failed to open .XSB", L"Error", MB_OK); return; }
+    FILE* fXBB = nullptr;
+    errno_t err = _wfopen_s(&fXBB, xbbPath, L"rb");
+    if (err != 0 || fXBB == nullptr) {
+        MessageBoxW(hwnd, L"Failed to open .XBB", L"Error", MB_OK);
+        return;
+    }
+
+    FILE* fXSB = nullptr;
+    err = _wfopen_s(&fXSB, xsbPath, L"rb");
+    if (err != 0 || fXSB == nullptr) {
+        fclose(fXBB);
+        MessageBoxW(hwnd, L"Failed to open .XSB", L"Error", MB_OK);
+        return;
+    }
 
     uint32_t fileSize = 0, entryCount = 0;
     fread(&fileSize, 4, 1, fXBB);
@@ -103,8 +112,11 @@ static void DoExtract(HWND hwnd) {
         wchar_t outPath[MAX_PATH];
         swprintf(outPath, MAX_PATH, L"%s\\track_%03u.wav", outDir, i);
 
-        FILE* out = _wfopen(outPath, L"wb");
-        if (!out) { free(headerBuf); break; }
+        FILE* out = nullptr;
+        if (_wfopen_s(&out, outPath, L"wb") != 0) {
+            free(headerBuf);
+            break;
+        }
         fwrite(headerBuf, 1, headerLen, out);
         free(headerBuf);
 
@@ -161,12 +173,16 @@ static void DoRepack(HWND hwnd) {
     FindClose(hFind);
 
     uint32_t entryCount = (uint32_t)wavFiles.size();
-    FILE* fXBB = _wfopen(xbbPath, L"wb");
-    FILE* fXSB = _wfopen(xsbPath, L"wb");
-    if (!fXBB || !fXSB) {
-        MessageBoxW(hwnd, L"Failed to create output files", L"Error", MB_OK);
-        if (fXBB) fclose(fXBB);
-        if (fXSB) fclose(fXSB);
+    FILE* fXBB = nullptr;
+    errno_t err = _wfopen_s(&fXBB, xbbPath, L"wb");
+    if (err != 0 || fXBB == nullptr) {
+        MessageBoxW(hwnd, L"Failed to open .XBB", L"Error", MB_OK);
+        return;
+    }
+    FILE* fXSB = nullptr;
+    err = _wfopen_s(&fXSB, xsbPath, L"wb");
+    if (err != 0 || fXSB == nullptr) {
+        MessageBoxW(hwnd, L"Failed to create .XSB file", L"Error", MB_OK);
         return;
     }
 
@@ -179,7 +195,12 @@ static void DoRepack(HWND hwnd) {
 
     for (uint32_t i = 0; i < entryCount; i++) {
         // Read WAV file
-        FILE* w = _wfopen(wavFiles[i].c_str(), L"rb");
+        FILE* w = nullptr;
+        errno_t err = _wfopen_s(&w, wavFiles[i].c_str(), L"rb");
+        if (err != 0 || w == nullptr) {
+            // Handle error appropriately
+            continue;
+        }
         fseek(w, 0, SEEK_END);
         uint32_t fileSize = ftell(w);
         fseek(w, 0, SEEK_SET);
