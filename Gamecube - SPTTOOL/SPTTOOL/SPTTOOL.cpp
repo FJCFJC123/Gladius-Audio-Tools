@@ -1,5 +1,4 @@
 #define UNICODE
-#define _CRT_SECURE_NO_WARNINGS
 
 #include <windows.h>
 #include <commdlg.h>
@@ -67,10 +66,18 @@ void ExtractSptSpd(HWND hwnd) {
 
     if (!BrowseForFolder(hwnd, outDir, L"Select Output Folder for DSPs")) return;
 
-    FILE* spt = _wfopen(sptPath, L"rb");
-    FILE* spd = _wfopen(spdPath, L"rb");
-    if (!spt || !spd) {
-        MessageBoxW(hwnd, L"Failed to open SPT/SPD files.", L"Error", MB_OK);
+    FILE* spt = nullptr;
+    errno_t err = _wfopen_s(&spt, sptPath, L"rb");
+    if (err != 0 || !spt) {
+        MessageBoxW(hwnd, L"Failed to open SPT file.", L"Error", MB_OK);
+        return;
+    }
+
+    FILE* spd = nullptr;
+    errno_t spdErr = _wfopen_s(&spd, spdPath, L"rb");
+    if (spdErr != 0 || !spd) {
+        MessageBoxW(hwnd, L"Failed to open SPD file.", L"Error", MB_OK);
+        fclose(spt);
         return;
     }
 
@@ -93,8 +100,12 @@ void ExtractSptSpd(HWND hwnd) {
         int nextdataoff = get32be(buf1 + 0x10) / 2 + 1;
         wchar_t fname[MAX_PATH];
         swprintf(fname, MAX_PATH, L"%s\\%03d.dsp", outDir, i);
-        FILE* out = _wfopen(fname, L"wb");
-        if (!out) continue;
+        FILE* out = nullptr;
+        errno_t err = _wfopen_s(&out, fname, L"wb");
+        if (err != 0 || !out) {
+            // Handle error if file cannot be opened
+            continue;
+        }
 
         int size = (nextdataoff - dataoff);
         int samples = size * 7 / 4;
@@ -145,14 +156,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 ofn.lpstrTitle = L"Save As SPT File";
                 if (!GetSaveFileName(&ofn)) return 0;
 
-                wcscpy(outputSPD, outputSPT);
+                wcscpy_s(outputSPD, MAX_PATH, outputSPT);
                 size_t len = wcslen(outputSPD);
-                if (len > 4) wcscpy(&outputSPD[len - 4], L".spd");
+                if (len > 4) wcscpy_s(&outputSPD[len - 4], MAX_PATH - (len - 4), L".spd");
 
-                FILE* out_spt = _wfopen(outputSPT, L"wb");
-                FILE* out_spd = _wfopen(outputSPD, L"wb");
-                if (!out_spt || !out_spd) {
-                    MessageBoxW(hwnd, L"Failed to create output files.", L"Error", MB_OK);
+                FILE* out_spt = nullptr;
+                errno_t sptErr = _wfopen_s(&out_spt, outputSPT, L"wb");
+                if (sptErr != 0 || !out_spt) {
+                    MessageBoxW(hwnd, L"Failed to create output SPT file.", L"Error", MB_OK);
+                    return 0;
+                }
+
+                FILE* out_spd = nullptr;
+                errno_t spdErr = _wfopen_s(&out_spd, outputSPD, L"wb");
+                if (spdErr != 0 || !out_spd) {
+                    MessageBoxW(hwnd, L"Failed to create output SPD file.", L"Error", MB_OK);
+                    fclose(out_spt);
                     return 0;
                 }
 
@@ -173,9 +192,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     wchar_t dsp_path_w[MAX_PATH];
                     char dsp_path[MAX_PATH];
                     swprintf(dsp_path_w, MAX_PATH, L"%s\\%03d.dsp", folderPath, i);
-                    wcstombs(dsp_path, dsp_path_w, MAX_PATH);
+                    size_t convertedChars = 0;
+                    wcstombs_s(&convertedChars, dsp_path, MAX_PATH, dsp_path_w, MAX_PATH);
 
-                    FILE* dsp = fopen(dsp_path, "rb");
+                    FILE* dsp = nullptr;
+                    if (fopen_s(&dsp, dsp_path, "rb") != 0) {
+                        // Handle error if file cannot be opened
+                        dsp = nullptr;
+                    }
                     if (!dsp) continue;
 
                     unsigned char dsp_header[DSP_HEADER_SIZE];
