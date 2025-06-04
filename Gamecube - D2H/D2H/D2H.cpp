@@ -1,5 +1,4 @@
 ﻿#define UNICODE
-#define _CRT_SECURE_NO_WARNINGS
 
 #include <windows.h>
 #include <commdlg.h>
@@ -77,8 +76,14 @@ void ExtractD2h(HWND hwnd) {
     ofn.lpstrTitle = L"Save As TXT";
     if (!GetSaveFileNameW(&ofn)) return;
 
-    FILE* d2h = _wfopen(d2hPath, L"rb");
-    FILE* txt = _wfopen(txtPath, L"w");
+    FILE* d2h = nullptr;
+    if (_wfopen_s(&d2h, d2hPath, L"rb") != 0) {
+        d2h = nullptr; // Ensure d2h is null if the file couldn't be opened
+    }
+    FILE* txt = nullptr;
+    if (_wfopen_s(&txt, txtPath, L"w") != 0) {
+        txt = nullptr; // Ensure txt is null if the file couldn't be opened
+    }
     if (!d2h || !txt) {
         MessageBoxW(hwnd, L"Cannot open files", L"Error", MB_OK | MB_ICONERROR);
         if (d2h) fclose(d2h);
@@ -145,8 +150,9 @@ void RepackD2h(HWND hwnd) {
         return;
     }
 
-    FILE* f = _wfopen(outPath, L"wb");
-    if (!f) {
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, outPath, L"wb") != 0) {
+        f = nullptr; // Ensure f is null if the file couldn't be opened
         MessageBoxW(hwnd, L"Cannot create D2H file at the selected location.", L"Error", MB_OK | MB_ICONERROR);
         return;
     }
@@ -179,7 +185,10 @@ void RepackD2h(HWND hwnd) {
         memcpy(entry, name8, len);
 
         // DS2 metadata
-        FILE* ds2 = _wfopen(fullpath.c_str(), L"rb");
+        FILE* ds2 = nullptr;
+        if (_wfopen_s(&ds2, fullpath.c_str(), L"rb") != 0) {
+            ds2 = nullptr; // Ensure ds2 is null if the file couldn't be opened
+        }
         if (ds2) {
             fread(entry + NAME_REGION_SIZE, 1, DS2_HEADER_SIZE, ds2);
             fclose(ds2);
