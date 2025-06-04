@@ -1,6 +1,4 @@
 #define UNICODE
-#define _CRT_SECURE_NO_WARNINGS
-
 #include <windows.h>
 #include <commdlg.h>
 #include <shlobj.h>
@@ -51,9 +49,10 @@ void ExtractDsh(HWND hwnd) {
     ofn.lpstrTitle = L"Open DSH File";
     if (!GetOpenFileNameW(&ofn)) return;
 
-    wcscpy(txtPath, dshPath);
+    wcscpy_s(txtPath, MAX_PATH, dshPath);
     wchar_t* dot = wcsrchr(txtPath, L'.');
-    if (dot) wcscpy(dot, L".txt"); else wcscat(txtPath, L".txt");
+    if (dot) wcscpy_s(dot, MAX_PATH - (dot - txtPath), L".txt"); 
+    else wcscat_s(txtPath, MAX_PATH, L".txt");
 
     ofn.lpstrFilter = L"Text Files (*.txt)\0*.txt\0";
     ofn.lpstrFile = txtPath;
@@ -61,12 +60,18 @@ void ExtractDsh(HWND hwnd) {
     ofn.Flags = OFN_OVERWRITEPROMPT;
     if (!GetSaveFileNameW(&ofn)) return;
 
-    FILE* dsh = _wfopen(dshPath, L"rb");
-    FILE* txt = _wfopen(txtPath, L"w,ccs=UTF-8");
-    if (!dsh || !txt) {
-        if (dsh) fclose(dsh);
-        if (txt) fclose(txt);
-        MessageBoxW(hwnd, L"Failed to open files.", L"Error", MB_OK);
+    FILE* dsh = nullptr;
+    errno_t err = _wfopen_s(&dsh, dshPath, L"rb");
+    if (err != 0 || dsh == nullptr) {
+        MessageBoxW(hwnd, L"Failed to open DSH file.", L"Error", MB_OK);
+        return;
+    }
+
+    FILE* txt = nullptr;
+    err = _wfopen_s(&txt, txtPath, L"w,ccs=UTF-8");
+    if (err != 0 || txt == nullptr) {
+        fclose(dsh);
+        MessageBoxW(hwnd, L"Failed to open TXT file.", L"Error", MB_OK);
         return;
     }
 
@@ -137,10 +142,10 @@ void AddFileToList(const wchar_t* fullPath) {
     wchar_t fileName[MAX_PATH];
     const wchar_t* pName = wcsrchr(fullPath, L'\\');
     if (pName) {
-        wcscpy(fileName, pName + 1);
+        wcscpy_s(fileName, MAX_PATH, pName + 1);
     }
     else {
-        wcscpy(fileName, fullPath);
+        wcscpy_s(fileName, MAX_PATH, fullPath);
     }
 
     LVITEMW lvi = { 0 };
@@ -154,7 +159,7 @@ void AddFileToList(const wchar_t* fullPath) {
         return;
     }
 
-    wcscpy(g_dspFilePaths[g_dspFileCount], fullPath);
+    wcscpy_s(g_dspFilePaths[g_dspFileCount], MAX_PATH, fullPath);
     g_dspFileCount++;
 }
 
@@ -174,8 +179,12 @@ void RepackDshFromList(HWND hwnd) {
     ofn.lpstrTitle = L"Save DSH As";
     if (!GetSaveFileNameW(&ofn)) return;
 
-    FILE* f = _wfopen(outPath, L"wb");
-    if (!f) { MessageBoxW(hwnd, L"Cannot create DSH file.", L"Error", MB_OK); return; }
+    FILE* f = nullptr;
+    errno_t err = _wfopen_s(&f, outPath, L"wb");
+    if (err != 0 || f == nullptr) {
+        MessageBoxW(hwnd, L"Cannot create DSH file.", L"Error", MB_OK);
+        return;
+    }
 
     unsigned char buf4[4]; put32be(buf4, (unsigned int)g_dspFileCount);
     fwrite(buf4, 1, 4, f);
@@ -195,10 +204,9 @@ void RepackDshFromList(HWND hwnd) {
         wchar_t dspFilenameOnly[MAX_PATH];
         const wchar_t* pName = wcsrchr(g_dspFilePaths[i], L'\\');
         if (pName) {
-            wcscpy(dspFilenameOnly, pName + 1);
-        }
-        else {
-            wcscpy(dspFilenameOnly, g_dspFilePaths[i]);
+            wcscpy_s(dspFilenameOnly, MAX_PATH, pName + 1);
+        } else {
+            wcscpy_s(dspFilenameOnly, MAX_PATH, g_dspFilePaths[i]);
         }
 
         char name8_utf8[NAME_REGION_SIZE]; // Buffer for UTF-8, exactly NAME_REGION_SIZE for safety
@@ -229,9 +237,16 @@ void RepackDshFromList(HWND hwnd) {
             MessageBoxW(hwnd, errorMsg, L"Warning", MB_OK);
         }
 
-
-        FILE* dsp = _wfopen(g_dspFilePaths[i], L"rb");
-        if (dsp) {
+        FILE* dsp = nullptr;
+        errno_t err = _wfopen_s(&dsp, g_dspFilePaths[i], L"rb");
+        if (err != 0 || dsp == nullptr) {
+            all_successful = FALSE; // Mark as not fully successful
+            wchar_t errorMsg[MAX_PATH + 100];
+            swprintf(errorMsg, sizeof(errorMsg) / sizeof(wchar_t),
+                L"Warning: Could not open DSP file '%s'. Its metadata will be zeroed.",
+                g_dspFilePaths[i]);
+            MessageBoxW(hwnd, errorMsg, L"Warning", MB_OK);
+        } else {
             fseek(dsp, 0, SEEK_END);
             long dsp_size = ftell(dsp);
             fseek(dsp, 0, SEEK_SET);
@@ -243,19 +258,10 @@ void RepackDshFromList(HWND hwnd) {
                     L"Warning: DSP file '%s' is smaller (%ld bytes) than DSP header size (%d bytes). Metadata will be zeroed.",
                     g_dspFilePaths[i], dsp_size, DSP_HEADER_SIZE);
                 MessageBoxW(hwnd, errorMsg, L"Warning", MB_OK);
-            }
-            else {
+            } else {
                 fread(entry + NAME_REGION_SIZE, 1, DSP_HEADER_SIZE, dsp);
             }
             fclose(dsp);
-        }
-        else {
-            all_successful = FALSE; // Mark as not fully successful
-            wchar_t errorMsg[MAX_PATH + 100];
-            swprintf(errorMsg, sizeof(errorMsg) / sizeof(wchar_t),
-                L"Warning: Could not open DSP file '%s'. Its metadata will be zeroed.",
-                g_dspFilePaths[i]);
-            MessageBoxW(hwnd, errorMsg, L"Warning", MB_OK);
         }
         fwrite(entry, 1, ENTRY_SIZE, f);
     }
