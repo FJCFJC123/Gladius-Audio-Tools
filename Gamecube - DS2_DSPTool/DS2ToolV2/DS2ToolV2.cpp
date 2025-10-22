@@ -1,4 +1,5 @@
-﻿#include <windows.h>
+#include <windows.h>
+#include <iostream>
 #define NOMINMAX 
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
 #include <shlobj.h> 
@@ -9,7 +10,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm> 
-#include <sstream>   
+#include <sstream>    
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -24,7 +25,8 @@ bool DecodeDS2toWav(const String& ds2Path, const String& wavPath);
 bool EncodeWavToDS2(const String& wavPath, const String& ds2Path);
 
 // DSP (Mono) functions
-bool DecodeMonoDspToWav(const String& dspPath, const String& wavPath);
+// MODIFIED: Function signature now accepts a window handle for pop-up messages
+bool DecodeMonoDspToWav(const String& dspPath, const String& wavPath, HWND hwndParent);
 bool EncodeWavToMonoDsp(const String& wavPath, const String& dspPath);
 
 
@@ -40,7 +42,7 @@ constexpr int IDC_BTN_ENC_DSP_BATCH = 109;
 
 HINSTANCE hInst;
 
-// Big-endian readers/writers and clamp16 
+// Big-endian readers/writers and clamp16 (unchanged)
 inline uint16_t read_u16_be(const uint8_t* buf) { return (uint16_t)((buf[0] << 8) | buf[1]); }
 inline int16_t  read_s16_be(const uint8_t* buf) { return (int16_t)((buf[0] << 8) | buf[1]); }
 inline uint32_t read_u32_be(const uint8_t* buf) { return (uint32_t)((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]); }
@@ -49,7 +51,7 @@ inline void write_s16_be(uint8_t* buf, int16_t val) { write_u16_be(buf, static_c
 inline void write_u32_be(uint8_t* buf, uint32_t val) { buf[0] = static_cast<uint8_t>((val >> 24) & 0xFF); buf[1] = static_cast<uint8_t>((val >> 16) & 0xFF); buf[2] = static_cast<uint8_t>((val >> 8) & 0xFF); buf[3] = static_cast<uint8_t>(val & 0xFF); }
 inline int32_t clamp16(int32_t v) { return v < -32768 ? -32768 : v > 32767 ? 32767 : v; }
 
-// MODIFIED WriteWav function
+// WriteWav function (unchanged)
 void WriteWav(const String& path, const std::vector<int16_t>& pcm_data, int sampleRate, uint16_t num_channels_to_write) {
     std::ofstream f(path, std::ios::binary);
     if (!f.is_open()) return;
@@ -75,7 +77,7 @@ void WriteWav(const String& path, const std::vector<int16_t>& pcm_data, int samp
     f.close();
 }
 
-// DspChannelHeader struct 
+// DspChannelHeader struct (unchanged)
 struct DspChannelHeader {
     uint8_t raw[0x60];
     DspChannelHeader() { std::memset(raw, 0, sizeof(raw)); }
@@ -111,7 +113,7 @@ struct DspChannelHeader {
     uint32_t get_offset_to_adpcm_data() const { return read_u32_be(raw + 0x5C); }
 };
 
-// DecodeDS2toWav 
+// DecodeDS2toWav (unchanged)
 bool DecodeDS2toWav(const String& ds2Path, const String& wavPath) {
     std::ifstream in(ds2Path, std::ios::binary | std::ios::ate);
     if (!in) return false;
@@ -138,8 +140,6 @@ bool DecodeDS2toWav(const String& ds2Path, const String& wavPath) {
     if (offsetL_ADPCM != 0xC0 || offsetR_ADPCM < (offsetL_ADPCM + calculatedAdpcmDataSizeBytesL) ||
         offsetL_ADPCM + calculatedAdpcmDataSizeBytesL > fileSize ||
         offsetR_ADPCM + calculatedAdpcmDataSizeBytesR > fileSize) {
-        // Allow for variations, but this could be an error condition in strict parsers.
-        // Original code had an empty if block here.
     }
     std::vector<uint8_t> fileData(fileSize);
     in.seekg(0); in.read(reinterpret_cast<char*>(fileData.data()), fileSize); in.close();
@@ -179,7 +179,7 @@ bool DecodeDS2toWav(const String& ds2Path, const String& wavPath) {
     return true;
 }
 
-// WavData struct and find_chunk, ReadWavFile 
+// WavData struct and find_chunk, ReadWavFile (unchanged)
 struct WavData {
     uint32_t sampleRate = 0; uint16_t numChannels = 0; uint16_t bitsPerSample = 0;
     uint32_t totalSamplesPerChannel = 0; std::vector<int16_t> pcmSamplesLeft;
@@ -193,7 +193,7 @@ bool find_chunk(std::ifstream& f, const char* chunkID_target, uint32_t& chunkSiz
         if (std::strncmp(id, chunkID_target, 4) == 0) { return true; }
         std::streampos currentPos = f.tellg();
         if (!f.seekg(chunkSize, std::ios_base::cur)) { f.clear(); f.seekg(initialPos); return false; }
-        if (f.tellg() <= currentPos && chunkSize > 0) { f.clear(); f.seekg(initialPos); return false; } // Protect against empty chunks or seek errors
+        if (f.tellg() <= currentPos && chunkSize > 0) { f.clear(); f.seekg(initialPos); return false; }
     }
     f.clear(); f.seekg(initialPos); return false;
 }
@@ -201,25 +201,25 @@ WavData ReadWavFile(const String& wavPath) {
     WavData wav; std::ifstream f(wavPath, std::ios::binary);
     if (!f.is_open()) return wav; char chunkID[4]; uint32_t chunkSize;
     if (!f.read(chunkID, 4) || std::strncmp(chunkID, "RIFF", 4) != 0) return wav;
-    f.seekg(4, std::ios_base::cur); // Skip RIFF size
+    f.seekg(4, std::ios_base::cur);
     if (!f.read(chunkID, 4) || std::strncmp(chunkID, "WAVE", 4) != 0) return wav;
     if (!find_chunk(f, "fmt ", chunkSize) || chunkSize < 16) return wav;
     uint16_t audioFormat; f.read(reinterpret_cast<char*>(&audioFormat), 2);
     f.read(reinterpret_cast<char*>(&wav.numChannels), 2); f.read(reinterpret_cast<char*>(&wav.sampleRate), 4);
-    f.seekg(4, std::ios_base::cur); // Skip ByteRate
+    f.seekg(4, std::ios_base::cur);
     uint16_t blockAlign_wav;
     f.read(reinterpret_cast<char*>(&blockAlign_wav), 2); f.read(reinterpret_cast<char*>(&wav.bitsPerSample), 2);
     if (audioFormat != 1 || wav.numChannels == 0 || wav.bitsPerSample != 16) { return wav; }
-    if (chunkSize > 16) f.seekg(chunkSize - 16, std::ios_base::cur); // Skip extra fmt bytes
+    if (chunkSize > 16) f.seekg(chunkSize - 16, std::ios_base::cur);
     if (!find_chunk(f, "data", chunkSize)) return wav;
     uint32_t bytesPerSampleSet = wav.numChannels * (wav.bitsPerSample / 8);
-    if (bytesPerSampleSet == 0) return wav; // Avoid division by zero
+    if (bytesPerSampleSet == 0) return wav;
     wav.totalSamplesPerChannel = chunkSize / bytesPerSampleSet;
     wav.pcmSamplesLeft.resize(wav.totalSamplesPerChannel);
-    if (wav.numChannels >= 2) { // Handle stereo or more, take first two
+    if (wav.numChannels >= 2) {
         wav.pcmSamplesRight.resize(wav.totalSamplesPerChannel);
     }
-    else if (wav.numChannels == 1) { // Mono: duplicate to right for DS2 encoding simplicity
+    else if (wav.numChannels == 1) {
         wav.pcmSamplesRight.resize(wav.totalSamplesPerChannel);
     }
     for (uint32_t i = 0; i < wav.totalSamplesPerChannel; ++i) {
@@ -228,15 +228,14 @@ WavData ReadWavFile(const String& wavPath) {
         if (wav.numChannels >= 2) {
             int16_t sampleR; if (!f.read(reinterpret_cast<char*>(&sampleR), sizeof(int16_t))) { wav.valid = false; return wav; }
             wav.pcmSamplesRight[i] = sampleR;
-            // If more than 2 channels, skip them
             if (wav.numChannels > 2) f.seekg((wav.numChannels - 2) * (wav.bitsPerSample / 8), std::ios_base::cur);
         }
-        else if (wav.numChannels == 1) { wav.pcmSamplesRight[i] = sampleL; } // Duplicate mono to right channel
+        else if (wav.numChannels == 1) { wav.pcmSamplesRight[i] = sampleL; }
     }
     wav.valid = true; return wav;
 }
 
-// EncodeChannelADPCM
+// EncodeChannelADPCM (unchanged)
 std::vector<uint8_t> EncodeChannelADPCM(
     const std::vector<int16_t>& pcmSamples, uint32_t totalSamplesToEncode,
     int16_t& io_hist1, int16_t& io_hist2, const int16_t adpcmCoefs[16],
@@ -296,12 +295,12 @@ std::vector<uint8_t> EncodeChannelADPCM(
     io_hist1 = currentHist1; io_hist2 = currentHist2; return encodedData;
 }
 
-// EncodeWavToDS2
+// EncodeWavToDS2 (unchanged)
 bool EncodeWavToDS2(const String& wavPath, const String& ds2Path) {
     WavData wav = ReadWavFile(wavPath);
     if (!wav.valid) { MessageBox(NULL, (L"DS2 Encode: Failed to read WAV: " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
     if (wav.totalSamplesPerChannel == 0) { MessageBox(NULL, (L"DS2 Encode: WAV has zero samples: " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
-    if (wav.pcmSamplesLeft.empty() || wav.pcmSamplesRight.empty()) { // Should be caught by totalSamplesPerChannel == 0 or ReadWavFile logic
+    if (wav.pcmSamplesLeft.empty() || wav.pcmSamplesRight.empty()) {
         MessageBox(NULL, (L"DS2 Encode: WAV has missing L/R channel data (after read): " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false;
     }
     uint32_t totalSamples = wav.totalSamplesPerChannel;
@@ -315,14 +314,14 @@ bool EncodeWavToDS2(const String& wavPath, const String& ds2Path) {
     uint32_t expected_adpcm_bytes = ((totalSamples + 13) / 14) * 8;
     if (adpcm_L_data_bytes != expected_adpcm_bytes || adpcm_R_data_bytes != expected_adpcm_bytes) { MessageBox(NULL, (L"DS2 Encode: ADPCM size mismatch for " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
     DspChannelHeader headerL, headerR;
-    headerL.set_num_samples(totalSamples); headerL.set_num_adpcm_nibbles(((totalSamples + 13) / 14) * 16); // Total nibbles for the channel
-    headerL.set_sample_rate(wav.sampleRate); headerL.set_loop_flag(0); headerL.set_format_info(0x0000); // 0x0000 for ADPCM
-    headerL.set_loop_start_nibble_addr(0); headerL.set_loop_end_sample_addr(totalSamples); // Loop end is sample number
+    headerL.set_num_samples(totalSamples); headerL.set_num_adpcm_nibbles(((totalSamples + 13) / 14) * 16);
+    headerL.set_sample_rate(wav.sampleRate); headerL.set_loop_flag(0); headerL.set_format_info(0x0000);
+    headerL.set_loop_start_nibble_addr(0); headerL.set_loop_end_sample_addr(totalSamples);
     headerL.set_current_adpcm_addr(0); headerL.set_coeffs(dsp_coefs); headerL.set_gain(0);
-    headerL.set_initial_pred_scale(predScaleL_first); headerL.set_initial_hist1(0); headerL.set_initial_hist2(0); // Standard practice sets initial history to 0 for encoding
-    headerL.set_loop_pred_scale(0); headerL.set_loop_hist1(0); headerL.set_loop_hist2(0); // No looping
+    headerL.set_initial_pred_scale(predScaleL_first); headerL.set_initial_hist1(0); headerL.set_initial_hist2(0);
+    headerL.set_loop_pred_scale(0); headerL.set_loop_hist1(0); headerL.set_loop_hist2(0);
     headerL.set_unknown_constants(); headerL.set_adpcm_data_size_bytes(adpcm_L_data_bytes);
-    headerL.set_offset_to_adpcm_data(0xC0); // Standard offset for left channel data in DS2
+    headerL.set_offset_to_adpcm_data(0xC0);
     headerR.set_num_samples(totalSamples); headerR.set_num_adpcm_nibbles(((totalSamples + 13) / 14) * 16);
     headerR.set_sample_rate(wav.sampleRate); headerR.set_loop_flag(0); headerR.set_format_info(0x0000);
     headerR.set_loop_start_nibble_addr(0); headerR.set_loop_end_sample_addr(totalSamples);
@@ -330,7 +329,7 @@ bool EncodeWavToDS2(const String& wavPath, const String& ds2Path) {
     headerR.set_initial_pred_scale(predScaleR_first); headerR.set_initial_hist1(0); headerR.set_initial_hist2(0);
     headerR.set_loop_pred_scale(0); headerR.set_loop_hist1(0); headerR.set_loop_hist2(0);
     headerR.set_unknown_constants(); headerR.set_adpcm_data_size_bytes(adpcm_R_data_bytes);
-    headerR.set_offset_to_adpcm_data(0xC0 + adpcm_L_data_bytes); // Right channel data follows left
+    headerR.set_offset_to_adpcm_data(0xC0 + adpcm_L_data_bytes);
     std::ofstream out(ds2Path, std::ios::binary);
     if (!out.is_open()) { MessageBox(NULL, (L"DS2 Encode: Failed to create output file: " + ds2Path).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
     out.write(reinterpret_cast<const char*>(headerL.raw), sizeof(headerL.raw));
@@ -340,34 +339,34 @@ bool EncodeWavToDS2(const String& wavPath, const String& ds2Path) {
     out.close(); return true;
 }
 
-// EncodeWavToMonoDsp
+// EncodeWavToMonoDsp (unchanged)
 bool EncodeWavToMonoDsp(const String& wavPath, const String& dspPath) {
     WavData wav = ReadWavFile(wavPath);
     if (!wav.valid) { MessageBox(NULL, (L"DSP Encode: Failed to read WAV: " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
     if (wav.totalSamplesPerChannel == 0) { MessageBox(NULL, (L"DSP Encode: WAV has zero samples: " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
-    if (wav.pcmSamplesLeft.empty()) { // Should be caught by totalSamplesPerChannel or ReadWavFile
+    if (wav.pcmSamplesLeft.empty()) {
         MessageBox(NULL, (L"DSP Encode: WAV has missing L channel data (after read): " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false;
     }
-    const std::vector<int16_t>& monoPcmData = wav.pcmSamplesLeft; // Use left channel for mono
+    const std::vector<int16_t>& monoPcmData = wav.pcmSamplesLeft;
     uint32_t totalSamples = wav.totalSamplesPerChannel;
     const int16_t dsp_coefs[16] = { 2048, 0, 0, 0, 4096, -2048, 2048, -2048, 3072, -1024, 1024, 512, 512, 256, 2048, 1024 };
-    int16_t initialHist1 = 0, initialHist2 = 0; // ADPCM history state, reset for each channel
-    uint16_t predScale_first = 0; // To store the first block's predictor/scale
+    int16_t initialHist1 = 0, initialHist2 = 0;
+    uint16_t predScale_first = 0;
     std::vector<uint8_t> adpcm_data = EncodeChannelADPCM(monoPcmData, totalSamples, initialHist1, initialHist2, dsp_coefs, predScale_first);
     uint32_t adpcm_data_bytes = static_cast<uint32_t>(adpcm_data.size());
     uint32_t expected_adpcm_bytes = ((totalSamples + 13) / 14) * 8;
     if (adpcm_data_bytes != expected_adpcm_bytes) { MessageBox(NULL, (L"DSP Encode: ADPCM size mismatch for " + wavPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
     DspChannelHeader header;
     header.set_num_samples(totalSamples);
-    header.set_num_adpcm_nibbles(((totalSamples + 13) / 14) * 16); // Total nibbles
+    header.set_num_adpcm_nibbles(((totalSamples + 13) / 14) * 16);
     header.set_sample_rate(wav.sampleRate);
-    header.set_loop_flag(0); header.set_format_info(0x0000); // 0x0000 for ADPCM
-    header.set_loop_start_nibble_addr(0); header.set_loop_end_sample_addr(totalSamples); // Loop end is sample number
+    header.set_loop_flag(0); header.set_format_info(0x0000);
+    header.set_loop_start_nibble_addr(0); header.set_loop_end_sample_addr(totalSamples);
     header.set_current_adpcm_addr(0); header.set_coeffs(dsp_coefs); header.set_gain(0);
     header.set_initial_pred_scale(predScale_first); header.set_initial_hist1(0); header.set_initial_hist2(0);
     header.set_loop_pred_scale(0); header.set_loop_hist1(0); header.set_loop_hist2(0);
     header.set_unknown_constants(); header.set_adpcm_data_size_bytes(adpcm_data_bytes);
-    header.set_offset_to_adpcm_data(0x60); // Standard for single channel DSP
+    header.set_offset_to_adpcm_data(0x60);
     std::ofstream out(dspPath, std::ios::binary);
     if (!out.is_open()) { MessageBox(NULL, (L"DSP Encode: Failed to create output file: " + dspPath).c_str(), L"Error", MB_OK | MB_ICONERROR); return false; }
     out.write(reinterpret_cast<const char*>(header.raw), sizeof(header.raw));
@@ -375,65 +374,105 @@ bool EncodeWavToMonoDsp(const String& wavPath, const String& dspPath) {
     out.close(); return true;
 }
 
-// DecodeMonoDspToWav 
-bool DecodeMonoDspToWav(const String& dspPath, const String& wavPath) {
+// *** MODIFIED: DecodeMonoDspToWav with MessageBox error pop-ups ***
+// *** MODIFIED: DecodeMonoDspToWav with a 6-byte size cushion ***
+bool DecodeMonoDspToWav(const String& dspPath, const String& wavPath, HWND hwndParent) {
     std::ifstream in(dspPath, std::ios::binary | std::ios::ate);
-    if (!in) return false;
+    if (!in) {
+        MessageBoxW(hwndParent, (L"Could not open the DSP file for reading:\n\n" + dspPath).c_str(), L"File Open Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
     size_t fileSize = static_cast<size_t>(in.tellg());
-    if (fileSize < 0x60) { return false; } // Minimum size for DSP header
+    if (fileSize < 0x60) {
+        std::wstringstream ss;
+        ss << L"The file is too small to be a valid DSP file.\n\n"
+            << L"File: " << dspPath << L"\n"
+            << L"Size: " << fileSize << L" bytes (requires at least 96 bytes for the header).";
+        MessageBoxW(hwndParent, ss.str().c_str(), L"DSP Decode Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
     in.seekg(0);
     DspChannelHeader header;
-    if (!in.read(reinterpret_cast<char*>(header.raw), sizeof(header.raw))) return false;
+    if (!in.read(reinterpret_cast<char*>(header.raw), sizeof(header.raw))) {
+        MessageBoxW(hwndParent, (L"Failed to read the 96-byte header from the DSP file:\n\n" + dspPath).c_str(), L"File Read Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
     uint32_t totalSamples = header.get_num_samples();
-    if (totalSamples == 0) { return false; }
+    if (totalSamples == 0) {
+        MessageBoxW(hwndParent, (L"The file header reports zero audio samples, so there is nothing to decode.\n\nFile: " + dspPath).c_str(), L"DSP Decode Error", MB_OK | MB_ICONWARNING);
+        return false;
+    }
+
     uint32_t sampleRate = header.get_sample_rate();
-    if (sampleRate == 0) { return false; }
+    if (sampleRate == 0) {
+        MessageBoxW(hwndParent, (L"The file header reports a sample rate of 0 Hz, which is invalid.\n\nFile: " + dspPath).c_str(), L"DSP Decode Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
+    uint32_t offset_ADPCM = header.get_offset_to_adpcm_data();
+    uint32_t calculatedAdpcmDataSizeBytes = ((totalSamples + 13) / 14) * 8;
+
+    // MODIFIED CHECK: Allow the file to be up to 6 bytes smaller than the calculated size.
+    // This accounts for encoders that truncate the final, partially-used ADPCM block.
+    if (offset_ADPCM + calculatedAdpcmDataSizeBytes > fileSize + 6) {
+        std::wstringstream ss;
+        ss << L"The file is corrupt or severely truncated.\n"
+            << L"It is more than 6 bytes smaller than required by the header.\n\n"
+            << L"File: " << dspPath << L"\n\n"
+            << L"File Size: " << fileSize << L" bytes\n"
+            << L"Required Total Size: " << (offset_ADPCM + calculatedAdpcmDataSizeBytes) << L" bytes\n\n"
+            << L"The file is " << ((offset_ADPCM + calculatedAdpcmDataSizeBytes) - fileSize) << L" bytes too small.";
+        MessageBoxW(hwndParent, ss.str().c_str(), L"DSP Decode Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
+    // --- The rest of the function remains the same ---
     int16_t coefs[16];
     header.get_coeffs(coefs);
     int16_t hist1 = header.get_initial_hist1();
     int16_t hist2 = header.get_initial_hist2();
-    uint32_t offset_ADPCM = header.get_offset_to_adpcm_data();
-    // Some DSPs might have offset 0 if data immediately follows, but 0x60 is standard for headered.
-    if (offset_ADPCM != 0x60 && offset_ADPCM != 0) { /* Non-standard offset, could be an issue or intentional. Proceed. */ }
-    uint32_t calculatedAdpcmDataSizeBytes = ((totalSamples + 13) / 14) * 8;
-    if (offset_ADPCM + calculatedAdpcmDataSizeBytes > fileSize) { return false; } // Check bounds
+
     std::vector<uint8_t> fileData(fileSize);
-    in.seekg(0); // Rewind to read whole file (if needed, or just ADPCM data from offset)
-    in.read(reinterpret_cast<char*>(fileData.data()), fileSize); // Read whole file for simplicity in current decodeChannel
+    in.seekg(0);
+    in.read(reinterpret_cast<char*>(fileData.data()), fileSize);
     in.close();
+
     std::vector<int16_t> monoSamples(totalSamples);
-    // Decoder lambda (same as in DS2, adapted for single channel)
+
     auto decodeChannel = [&](uint32_t adpcm_data_start_offset, uint32_t num_channel_samples,
         int16_t& h1, int16_t& h2, const int16_t* channel_coefs,
         std::vector<int16_t>& out_samples, const uint8_t* all_file_data,
         size_t total_file_size) {
             size_t pcm_idx = 0; uint32_t adpcm_block_offset = adpcm_data_start_offset;
             while (pcm_idx < num_channel_samples) {
-                if (adpcm_block_offset + 8 > total_file_size) break; // ADPCM block is 8 bytes
+                if (adpcm_block_offset + 8 > total_file_size) break; // This check prevents reading past the actual end of the file
                 uint8_t hdr_byte = all_file_data[adpcm_block_offset];
-                int predIdx = (hdr_byte >> 4) & 0x0F; if (predIdx > 7) predIdx = 7; // Clamp predictor index
+                int predIdx = (hdr_byte >> 4) & 0x0F; if (predIdx > 7) predIdx = 7;
                 int shift = hdr_byte & 0x0F; int scale = 1 << shift;
                 int16_t c1 = channel_coefs[predIdx * 2 + 0]; int16_t c2 = channel_coefs[predIdx * 2 + 1];
                 for (int n = 0; n < 14 && pcm_idx < num_channel_samples; ++n) {
-                    if (adpcm_block_offset + 1 + (n >> 1) >= total_file_size) break; // Check bounds for nibble data
+                    if (adpcm_block_offset + 1 + (n >> 1) >= total_file_size) break; // This check prevents reading nibbles that don't exist
                     uint8_t byte_val = all_file_data[adpcm_block_offset + 1 + (n >> 1)];
-                    int8_t nib = (n & 1) ? (byte_val & 0x0F) : (byte_val >> 4); // Get high or low nibble
-                    if (nib & 0x8) nib |= 0xF0; // Sign extend 4-bit nibble to 8-bit
+                    int8_t nib = (n & 1) ? (byte_val & 0x0F) : (byte_val >> 4);
+                    if (nib & 0x8) nib |= 0xF0;
                     int32_t sVal = static_cast<int32_t>(nib) * scale; sVal <<= 11;
                     int32_t prediction = static_cast<int32_t>(c1) * h1 + static_cast<int32_t>(c2) * h2;
-                    int32_t sum = sVal + prediction + 1024; // Add 1024 for rounding
+                    int32_t sum = sVal + prediction + 1024;
                     int16_t sample_out = static_cast<int16_t>(clamp16(sum >> 11));
                     h2 = h1; h1 = sample_out; out_samples[pcm_idx++] = sample_out;
                 }
-                adpcm_block_offset += 8; // Move to next ADPCM block
+                adpcm_block_offset += 8;
             }
         };
     decodeChannel(offset_ADPCM, totalSamples, hist1, hist2, coefs, monoSamples, fileData.data(), fileSize);
-    WriteWav(wavPath, monoSamples, sampleRate, 1); // Write as mono WAV
+    WriteWav(wavPath, monoSamples, sampleRate, 1);
     return true;
 }
 
-// SelectFolderDialog 
+// SelectFolderDialog (unchanged)
 String SelectFolderDialog(HWND hwndOwner, const wchar_t* title) {
     wchar_t path[MAX_PATH]; BROWSEINFOW bi = { 0 }; bi.hwndOwner = hwndOwner;
     bi.lpszTitle = title; bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
@@ -445,7 +484,7 @@ String SelectFolderDialog(HWND hwndOwner, const wchar_t* title) {
     return L"";
 }
 
-// GetFileName and GetFileExtension 
+// GetFileName and GetFileExtension (unchanged)
 String GetFileName(const String& filePath) {
     size_t lastSlash = filePath.find_last_of(L"\\/");
     return (lastSlash != String::npos) ? filePath.substr(lastSlash + 1) : filePath;
@@ -461,14 +500,16 @@ String GetFileExtension(const String& fileName) {
 }
 
 
-// Recursive Batch Processing
+// *** MODIFIED FUNCTION for Recursive Batch Processing with HWND ***
 void RecursiveBatchProcess(
     const String& currentDirPath,
     const String& operationDesc,
     const String& outputSubfolderName,
     const String& targetInputExtensionNoDot,
     const String& outputExtensionWithDot,
-    bool (*conversion_function)(const String&, const String&),
+    // MODIFICATION: The function pointer can now accept an HWND
+    void* conversion_function_ptr, // Use void* for generic pointer
+    bool takes_hwnd, // Flag to know which function type we have
     HWND hStatusLabel,
     HWND hMainWindow,
     int& totalFilesProcessed,
@@ -480,7 +521,7 @@ void RecursiveBatchProcess(
     HANDLE hFind = FindFirstFileW(searchPattern.c_str(), &findData);
 
     if (hFind == INVALID_HANDLE_VALUE) {
-        return; // Cannot access directory or it's empty
+        return;
     }
 
     std::vector<String> subDirectoriesToScan;
@@ -489,7 +530,7 @@ void RecursiveBatchProcess(
     do {
         String itemName = findData.cFileName;
         if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            if (itemName != L"." && itemName != L".." && itemName != outputSubfolderName) { // Avoid self-recursion into output folders
+            if (itemName != L"." && itemName != L".." && itemName != outputSubfolderName) {
                 subDirectoriesToScan.push_back(currentDirPath + L"\\" + itemName);
             }
         }
@@ -501,8 +542,7 @@ void RecursiveBatchProcess(
                 if (!outputDirCreatedForThisLevel) {
                     if (!CreateDirectoryW(outDirForThisLevel.c_str(), NULL)) {
                         if (GetLastError() != ERROR_ALREADY_EXISTS) {
-                            // Log or handle error: failed to create output directory for this level
-                            // For now, continue; conversion might fail if directory is crucial
+                            // Error handling
                         }
                     }
                     outputDirCreatedForThisLevel = true;
@@ -511,30 +551,40 @@ void RecursiveBatchProcess(
                 totalFilesProcessed++;
 
                 String inFile = currentDirPath + L"\\" + itemName;
-
                 String baseName = itemName;
                 size_t dotPos = baseName.find_last_of(L'.');
                 if (dotPos != String::npos) {
                     baseName = baseName.substr(0, dotPos);
                 }
-
                 String outFile = outDirForThisLevel + L"\\" + baseName + outputExtensionWithDot;
 
                 std::wstringstream ss;
                 String displayFileName = GetFileName(inFile);
-                if (displayFileName.length() > 30) { // Keep status line from getting too long
+                if (displayFileName.length() > 30) {
                     displayFileName = displayFileName.substr(0, 27) + L"...";
                 }
                 ss << operationDesc << L" (" << totalFilesProcessed << "): " << displayFileName;
                 SetWindowText(hStatusLabel, ss.str().c_str());
-                UpdateWindow(hMainWindow); // Ensure main window (and children) repaint
-                PeekMessage(NULL, NULL, 0, 0, PM_REMOVE); // Process pending messages
+                UpdateWindow(hMainWindow);
+                PeekMessage(NULL, NULL, 0, 0, PM_REMOVE);
 
-                if (conversion_function(inFile, outFile)) {
-                    totalFilesSucceeded++;
+                bool success = false;
+                if (takes_hwnd) {
+                    // Cast to the function type that takes an HWND
+                    auto func = reinterpret_cast<bool(*)(const String&, const String&, HWND)>(conversion_function_ptr);
+                    success = func(inFile, outFile, hMainWindow);
                 }
                 else {
+                    // Cast to the function type that does NOT take an HWND
+                    auto func = reinterpret_cast<bool(*)(const String&, const String&)>(conversion_function_ptr);
+                    success = func(inFile, outFile);
+                }
+
+                if (!success) {
                     totalFilesFailed++;
+                }
+                else {
+                    totalFilesSucceeded++;
                 }
             }
         }
@@ -542,15 +592,14 @@ void RecursiveBatchProcess(
 
     FindClose(hFind);
 
-    // Recursively process subdirectories
     for (const auto& subDir : subDirectoriesToScan) {
         RecursiveBatchProcess(subDir, operationDesc, outputSubfolderName, targetInputExtensionNoDot, outputExtensionWithDot,
-            conversion_function, hStatusLabel, hMainWindow, totalFilesProcessed, totalFilesSucceeded, totalFilesFailed);
+            conversion_function_ptr, takes_hwnd, hStatusLabel, hMainWindow, totalFilesProcessed, totalFilesSucceeded, totalFilesFailed);
     }
 }
 
 
-// WndProc - MODIFIED for new batch logic
+// *** MODIFIED WndProc to handle new function calls ***
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     static HWND btnDecDs2S, btnEncDs2S, stat,
         btnDecDs2B, btnEncDs2B,
@@ -608,16 +657,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (!in.empty()) {
                 String out = in.substr(0, in.find_last_of(L".")) + L".ds2"; SetWindowText(stat, L"WAV→DS2: Encoding...");
                 if (EncodeWavToDS2(in, out)) SetWindowText(stat, (L"WAV→DS2 Done: " + GetFileName(out)).c_str());
-                // EncodeWavToDS2 has its own MessageBox for errors, so a simple fail message here is okay.
-                // else SetWindowText(stat, L"WAV→DS2: Failed."); // Redundant if EncodeWavToDS2 shows message
             }
         }
         else if (LOWORD(wp) == IDC_BTN_DEC_DSP_SINGLE) {
             String in = OpenFileDialog(L"Mono DSP Files\0*.dsp\0All Files\0*.*\0");
             if (!in.empty()) {
                 String out = in.substr(0, in.find_last_of(L".")) + L".wav"; SetWindowText(stat, L"DSP→WAV: Decoding...");
-                if (DecodeMonoDspToWav(in, out)) SetWindowText(stat, (L"DSP→WAV Done: " + GetFileName(out)).c_str());
-                else SetWindowText(stat, L"DSP→WAV: Failed.");
+                // MODIFIED: Pass 'hwnd' to the function
+                if (DecodeMonoDspToWav(in, out, hwnd)) {
+                    SetWindowText(stat, (L"DSP→WAV Done: " + GetFileName(out)).c_str());
+                }
+                else {
+                    SetWindowText(stat, L"DSP→WAV: Failed. See pop-up for details.");
+                }
             }
         }
         else if (LOWORD(wp) == IDC_BTN_ENC_DSP_SINGLE) {
@@ -625,17 +677,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (!in.empty()) {
                 String out = in.substr(0, in.find_last_of(L".")) + L".dsp"; SetWindowText(stat, L"WAV→DSP: Encoding...");
                 if (EncodeWavToMonoDsp(in, out)) SetWindowText(stat, (L"WAV→DSP Done: " + GetFileName(out)).c_str());
-                // EncodeWavToMonoDsp has its own MessageBox for errors.
             }
         }
-        // Batch operations using RecursiveBatchProcess
+        // Batch operations
         else if (LOWORD(wp) == IDC_BTN_DEC_DS2_BATCH) {
             String folderPath = SelectFolderDialog(hwnd, L"Select Root Folder (Recursive DS2 → WAV)");
             if (!folderPath.empty()) {
                 SetWindowText(stat, L"DS2→WAV Batch: Scanning..."); UpdateWindow(hwnd);
                 int successCount = 0, failCount = 0, processedCount = 0;
                 RecursiveBatchProcess(folderPath, L"DS2→WAV", L"converted_stereo_wav", L"ds2", L".wav",
-                    DecodeDS2toWav, stat, hwnd, processedCount, successCount, failCount);
+                    (void*)DecodeDS2toWav, false, stat, hwnd, processedCount, successCount, failCount);
                 std::wstringstream summary;
                 summary << L"DS2→WAV Batch Done. Processed: " << processedCount << L", OK: " << successCount << L", Failed: " << failCount;
                 SetWindowText(stat, summary.str().c_str());
@@ -648,7 +699,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 SetWindowText(stat, L"WAV→DS2 Batch: Scanning..."); UpdateWindow(hwnd);
                 int successCount = 0, failCount = 0, processedCount = 0;
                 RecursiveBatchProcess(folderPath, L"WAV→DS2", L"converted_stereo_ds2", L"wav", L".ds2",
-                    EncodeWavToDS2, stat, hwnd, processedCount, successCount, failCount);
+                    (void*)EncodeWavToDS2, false, stat, hwnd, processedCount, successCount, failCount);
                 std::wstringstream summary;
                 summary << L"WAV→DS2 Batch Done. Processed: " << processedCount << L", OK: " << successCount << L", Failed: " << failCount;
                 SetWindowText(stat, summary.str().c_str());
@@ -660,8 +711,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (!folderPath.empty()) {
                 SetWindowText(stat, L"DSP→WAV Batch: Scanning..."); UpdateWindow(hwnd);
                 int successCount = 0, failCount = 0, processedCount = 0;
+                // MODIFIED: Pass the new function pointer and set the flag to true
                 RecursiveBatchProcess(folderPath, L"DSP→WAV", L"converted_mono_wav_from_dsp", L"dsp", L".wav",
-                    DecodeMonoDspToWav, stat, hwnd, processedCount, successCount, failCount);
+                    (void*)DecodeMonoDspToWav, true, stat, hwnd, processedCount, successCount, failCount);
                 std::wstringstream summary;
                 summary << L"DSP→WAV Batch Done. Processed: " << processedCount << L", OK: " << successCount << L", Failed: " << failCount;
                 SetWindowText(stat, summary.str().c_str());
@@ -674,7 +726,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 SetWindowText(stat, L"WAV→DSP Batch: Scanning..."); UpdateWindow(hwnd);
                 int successCount = 0, failCount = 0, processedCount = 0;
                 RecursiveBatchProcess(folderPath, L"WAV→DSP", L"converted_mono_dsp", L"wav", L".dsp",
-                    EncodeWavToMonoDsp, stat, hwnd, processedCount, successCount, failCount);
+                    (void*)EncodeWavToMonoDsp, false, stat, hwnd, processedCount, successCount, failCount);
                 std::wstringstream summary;
                 summary << L"WAV→DSP Batch Done. Processed: " << processedCount << L", OK: " << successCount << L", Failed: " << failCount;
                 SetWindowText(stat, summary.str().c_str());
@@ -691,7 +743,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     return 0;
 }
 
-// wWinMain 
+// wWinMain (unchanged)
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int cmdShow) {
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     hInst = hInstance;
@@ -700,25 +752,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int cmdShow) {
         NULL, L"DS2DSPConvClass", NULL };
     RegisterClassEx(&wc);
 
-    int windowWidth = 445; // Adjusted to fit current button layout (x2 + btnWidth + 10)
-    int windowHeight = 265; // Adjusted based on y_status + status_height + padding (y_status is y_row4 + btnHeight + 20 = 160+30+20=210. Status height 40. Total ~250 + title bar etc.)
+    int windowWidth = 445;
+    int windowHeight = 310;
 
-    // Recalculate window height based on your layout:
-    // y_status = y_row4 + btnHeight + 20;
-    // y_row4 = y_row3 + btnHeight + 10;
-    // y_row3 = y_row2 + btnHeight + 40;
-    // y_row2 = y_row1 + btnHeight + 10;
-    // y_row1 = 30;
-    // y_row1 = 30
-    // y_row2 = 30 + 30 + 10 = 70
-    // y_row3 = 70 + 30 + 40 = 140
-    // y_row4 = 140 + 30 + 10 = 180
-    // y_status = 180 + 30 + 20 = 230
-    // status height = 40
-    // Total content height = 230 + 40 = 270. Add ~30-40 for title bar/borders.
-    windowHeight = 310; // A bit more generous
-
-    HWND hwnd = CreateWindow(L"DS2DSPConvClass", L"DS2 (Stereo) & DSP (Mono) Converter v2.1", // Added a version hint
+    HWND hwnd = CreateWindow(L"DS2DSPConvClass", L"DS2 (Stereo) & DSP (Mono) Converter v2.2",
         WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX),
         CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,
         NULL, NULL, hInstance, NULL);
@@ -734,17 +771,17 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int cmdShow) {
     return 0;
 }
 
-// OpenFileDialog 
+// OpenFileDialog (unchanged)
 String OpenFileDialog(const wchar_t* filter) {
-    OPENFILENAMEW ofn{}; // Use OPENFILENAMEW for wide strings
+    OPENFILENAMEW ofn{};
     wchar_t buf[MAX_PATH]{};
     ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = NULL; // Can be main window handle
+    ofn.hwndOwner = NULL;
     ofn.lpstrFilter = filter;
     ofn.lpstrFile = buf;
     ofn.nMaxFile = MAX_PATH;
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER;
     ofn.lpstrDefExt = L"";
-    if (GetOpenFileNameW(&ofn)) return buf; // Use GetOpenFileNameW
+    if (GetOpenFileNameW(&ofn)) return buf;
     return L"";
 }
