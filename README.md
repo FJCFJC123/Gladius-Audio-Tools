@@ -13,7 +13,9 @@ SPT/SPD Tool  - Extract Existing / Build New SPT/SPD Combo
 
 FLO GUI Tool - Utility For loading and editing .Flo files
 
-Wav Rename Tool - Utility that parses .flo and renames extracted Wavs accordingly 
+The WavRename now contains the XBB/XSB extraction function, it serves as an AIO extractor of the audio tracks as well as giving them proper file names.
+Select the xbox audio folder which is located at ISO/Data/Audio/Xbox/ run tool
+the extracted audio will be a Xbox specfic audio codec youll need to convert for playback in standard media players
+use switch audio converter to convert them into standard WAV format,
 
-XSB/XBB Tool - Extracts Existing / Builds New XSB/XBB Combo
 
