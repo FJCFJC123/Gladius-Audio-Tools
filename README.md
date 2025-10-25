@@ -19,3 +19,4 @@ the extracted audio will be a Xbox specfic audio codec youll need to convert for
 use switch audio converter to convert them into standard WAV format,
 
 
+***Im no coder AI is my friend for these fair warning***
